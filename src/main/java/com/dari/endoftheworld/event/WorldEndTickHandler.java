@@ -1,5 +1,6 @@
 package com.dari.endoftheworld.event;
 
+import com.dari.endoftheworld.catastrophe.DisasterScheduler;
 import com.dari.endoftheworld.world.WorldEndState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.event.TickEvent;
@@ -7,25 +8,19 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 
 /**
- * Advances {@link WorldEndState} once per server tick. Server-only: this class
- * must never touch client state or run on the client.
+ * Advances {@link WorldEndState} and rolls {@link DisasterScheduler} once per
+ * server tick. Server-only: this class must never touch client state or run
+ * on the client.
  * <p>
- * NOTE ON THIS FILE: originally written with {@code @Mod.EventBusSubscriber} +
- * {@code @SubscribeEvent}, which turned out not to compile — the annotation's
- * package (net.minecraftforge.eventbus.api.SubscribeEvent) does not exist in
- * EventBus 7. Per the EventBus 7 migration guide, the replacement pattern is
- * "MinecraftForge.EVENT_BUS -> EventName.BUS", i.e. every Forge event class
- * now exposes a static BUS field to add listeners to directly — the same
- * pattern already confirmed working for FMLCommonSetupEvent in
- * EndOfTheWorldMod.java. Call {@link #register()} once from that class's
- * constructor to wire these listeners up.
- * This is my best-grounded guess given the migration guide, but — like the
- * rest of this stage — it has not been confirmed by an actual compile yet.
- * If gradlew build still fails here, send me the exact error.
+ * Confirmed working by a real GitHub Actions build (Stage 2): the manual
+ * {@code EventName.BUS.addListener(...)} registration pattern below compiles
+ * and runs correctly on this Forge build. Call {@link #register()} once from
+ * the mod constructor to wire it up.
  */
 public final class WorldEndTickHandler {
 
     private static MinecraftServer server;
+    private static final DisasterScheduler DISASTER_SCHEDULER = new DisasterScheduler();
 
     private WorldEndTickHandler() {
     }
@@ -49,6 +44,9 @@ public final class WorldEndTickHandler {
         if (server == null) {
             return;
         }
-        WorldEndState.get(server.overworld()).tick();
+
+        WorldEndState state = WorldEndState.get(server.overworld());
+        state.tick();
+        DISASTER_SCHEDULER.tick(server.overworld(), state.getPhase());
     }
 }
