@@ -1,29 +1,28 @@
 package com.dari.endoftheworld;
 
+import com.dari.endoftheworld.config.EndOfTheWorldConfig;
 import com.mojang.logging.LogUtils;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
 /**
  * Root entry point of the mod.
- * Kept intentionally empty of game logic for now — this is Stage 1 (Этап 1):
- * a minimal buildable skeleton to confirm Gradle build + game launch work
- * before any catastrophe/bunker systems are added.
  *
- * NOTE ON THIS FILE: Forge 61.x for 1.21.11 ships with the new EventBus 7
- * system (confirmed via the eventbus-validator dependency and the
- * eventbus.api.strictRuntimeChecks run property in the official 1.21.11
- * MDK build.gradle). Per EventBus 7's migration guide, the mod constructor
- * takes FMLJavaModLoadingContext and mod-bus events are obtained via
- * EventName.getBus(modBusGroup) rather than the older
- * FMLJavaModLoadingContext.get().getModEventBus() pattern.
- * I was not able to fetch the literal official ExampleMod.java for 1.21.11
- * to triple-confirm this exact signature (GitHub blocked automated access
- * to that specific file), so please run `gradlew build` first and tell me
- * the exact compiler error if this constructor doesn't match — I'll fix it
- * immediately rather than guess further.
+ * Stage 1 (Этап 1) — confirmed via a real GitHub Actions build: the
+ * constructor signature and EventBus 7 pattern below (FMLJavaModLoadingContext
+ * + context.getModBusGroup() + EventName.getBus(modBusGroup)) compile and
+ * run correctly against Forge 61.1.5 / Minecraft 1.21.11.
+ *
+ * Stage 2 (Этап 2) adds registration of EndOfTheWorldConfig — the common
+ * config spec that drives phase durations for WorldEndState.
+ * ModLoadingContext.get().registerConfig(...) is the long-standing,
+ * multi-version-stable pattern for config registration; unlike the
+ * constructor signature above, this one has not been verified against an
+ * actual compile yet — if gradlew build fails here, send me the exact error.
  */
 @Mod(EndOfTheWorldMod.MOD_ID)
 public class EndOfTheWorldMod {
@@ -36,7 +35,9 @@ public class EndOfTheWorldMod {
 
         FMLCommonSetupEvent.getBus(modBusGroup).addListener(this::commonSetup);
 
-        LOGGER.info("[{}] Мод инициализирован (Этап 1 — фундамент)", MOD_ID);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, EndOfTheWorldConfig.SPEC);
+
+        LOGGER.info("[{}] Мод инициализирован (Этап 2 — фаза/таймер/сохранение)", MOD_ID);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
