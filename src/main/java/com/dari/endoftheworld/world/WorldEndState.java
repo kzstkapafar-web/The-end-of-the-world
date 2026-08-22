@@ -17,14 +17,12 @@ import net.minecraft.world.level.saveddata.SavedDataType;
  * disaster scheduling, sky/weather effects, and bunker unlock logic belong in
  * their own systems that read {@link #getPhase()} — see Stage 3+.
  * <p>
- * NOTE ON THIS FILE: this is the fourth revision. Third revision moved to the
- * codec-based SavedDataType correctly, but nested the RecordCodecBuilder
- * directly inside the SavedDataType<> constructor call — Java's generic
- * inference can't resolve T when both sides depend on each other in one
- * expression, so `instance`/`state` in the lambdas silently degraded to
- * Object. Fixed by pulling CODEC out into its own explicitly-typed field so
- * each generic gets resolved independently. This part is a plain Java
- * generics issue, not a Forge API guess, so I'm confident in it.
+ * NOTE ON THIS FILE: this is the fifth revision. Fourth revision fixed the
+ * generic-inference issue but still failed — this Forge build (61.1.5) has
+ * no 3-arg convenience constructor (String, Supplier, Codec) on
+ * SavedDataType; only the 4-arg one with an explicit (nullable) DataFixTypes
+ * exists here. Fixed by passing null for that argument. Confirmed by the
+ * compiler's exact "argument lists differ in length" message, not guessed.
  */
 public class WorldEndState extends SavedData {
 
@@ -37,8 +35,8 @@ public class WorldEndState extends SavedData {
             Codec.LONG.fieldOf("TotalTicksElapsed").forGetter(state -> state.totalTicksElapsed)
     ).apply(instance, WorldEndState::fromSavedFields));
 
-    /** Codec-driven type descriptor: id, default-instance constructor, and (de)serialization codec. */
-    public static final SavedDataType<WorldEndState> TYPE = new SavedDataType<>(SAVE_NAME, WorldEndState::new, CODEC);
+    /** Codec-driven type descriptor: id, default-instance constructor, codec, and no data-fixer (null). */
+    public static final SavedDataType<WorldEndState> TYPE = new SavedDataType<>(SAVE_NAME, WorldEndState::new, CODEC, null);
 
     private EndPhase phase = EndPhase.NORMAL;
     private long ticksInCurrentPhase = 0L;
