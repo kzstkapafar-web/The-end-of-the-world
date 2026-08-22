@@ -1,6 +1,7 @@
 package com.dari.endoftheworld;
 
 import com.dari.endoftheworld.config.EndOfTheWorldConfig;
+import com.dari.endoftheworld.event.WorldEndTickHandler;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
@@ -17,12 +18,11 @@ import org.slf4j.Logger;
  * + context.getModBusGroup() + EventName.getBus(modBusGroup)) compile and
  * run correctly against Forge 61.1.5 / Minecraft 1.21.11.
  *
- * Stage 2 (Этап 2) adds registration of EndOfTheWorldConfig — the common
- * config spec that drives phase durations for WorldEndState.
- * ModLoadingContext.get().registerConfig(...) is the long-standing,
- * multi-version-stable pattern for config registration; unlike the
- * constructor signature above, this one has not been verified against an
- * actual compile yet — if gradlew build fails here, send me the exact error.
+ * Stage 2 (Этап 2) adds registration of EndOfTheWorldConfig and wires up
+ * WorldEndTickHandler on the game bus. ModLoadingContext.get().registerConfig(...)
+ * compiled fine but produces a [removal] deprecation warning (non-blocking) —
+ * left as-is for now since it doesn't fail the build; can be cleaned up later
+ * in favour of a direct container reference.
  */
 @Mod(EndOfTheWorldMod.MOD_ID)
 public class EndOfTheWorldMod {
@@ -36,6 +36,8 @@ public class EndOfTheWorldMod {
         FMLCommonSetupEvent.getBus(modBusGroup).addListener(this::commonSetup);
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, EndOfTheWorldConfig.SPEC);
+
+        WorldEndTickHandler.register();
 
         LOGGER.info("[{}] Мод инициализирован (Этап 2 — фаза/таймер/сохранение)", MOD_ID);
     }
