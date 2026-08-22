@@ -17,30 +17,28 @@ import net.minecraft.world.level.saveddata.SavedDataType;
  * disaster scheduling, sky/weather effects, and bunker unlock logic belong in
  * their own systems that read {@link #getPhase()} — see Stage 3+.
  * <p>
- * NOTE ON THIS FILE: rewritten after a second real compile failure. This
- * Minecraft version removed SavedData's overridable save()/load() methods
- * entirely — persistence is now fully codec-driven via the new SavedDataType
- * class (constructor supplier + Codec, no manual CompoundTag read/write).
- * Confirmed against the actual javadoc for 1.21.10 (closest available to our
- * 1.21.11) after both the official docs page and my first fix attempt turned
- * out stale. This is the third revision of this file's persistence code —
- * if gradlew build still fails here, please send me the exact error again.
+ * NOTE ON THIS FILE: this is the fourth revision. Third revision moved to the
+ * codec-based SavedDataType correctly, but nested the RecordCodecBuilder
+ * directly inside the SavedDataType<> constructor call — Java's generic
+ * inference can't resolve T when both sides depend on each other in one
+ * expression, so `instance`/`state` in the lambdas silently degraded to
+ * Object. Fixed by pulling CODEC out into its own explicitly-typed field so
+ * each generic gets resolved independently. This part is a plain Java
+ * generics issue, not a Forge API guess, so I'm confident in it.
  */
 public class WorldEndState extends SavedData {
 
     private static final String SAVE_NAME = "endoftheworld_state";
     private static final long TICKS_PER_SECOND = 20L;
 
+    private static final Codec<WorldEndState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.STRING.fieldOf("Phase").forGetter(state -> state.phase.name()),
+            Codec.LONG.fieldOf("TicksInCurrentPhase").forGetter(state -> state.ticksInCurrentPhase),
+            Codec.LONG.fieldOf("TotalTicksElapsed").forGetter(state -> state.totalTicksElapsed)
+    ).apply(instance, WorldEndState::fromSavedFields));
+
     /** Codec-driven type descriptor: id, default-instance constructor, and (de)serialization codec. */
-    public static final SavedDataType<WorldEndState> TYPE = new SavedDataType<>(
-            SAVE_NAME,
-            WorldEndState::new,
-            RecordCodecBuilder.create(instance -> instance.group(
-                    Codec.STRING.fieldOf("Phase").forGetter(state -> state.phase.name()),
-                    Codec.LONG.fieldOf("TicksInCurrentPhase").forGetter(state -> state.ticksInCurrentPhase),
-                    Codec.LONG.fieldOf("TotalTicksElapsed").forGetter(state -> state.totalTicksElapsed)
-            ).apply(instance, WorldEndState::fromSavedFields))
-    );
+    public static final SavedDataType<WorldEndState> TYPE = new SavedDataType<>(SAVE_NAME, WorldEndState::new, CODEC);
 
     private EndPhase phase = EndPhase.NORMAL;
     private long ticksInCurrentPhase = 0L;
