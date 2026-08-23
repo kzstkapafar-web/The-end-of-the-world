@@ -27,7 +27,7 @@ public final class EarthquakeDisaster implements Disaster {
     public void trigger(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
             player.sendSystemMessage(Component.literal("Земля дрожит под ногами..."));
-            level.playSound(null, player.blockPosition(), SoundEvents.GENERIC_EXPLODE,
+            level.playSound(null, player.blockPosition(), SoundEvents.GENERIC_EXPLODE.value(),
                     SoundSource.AMBIENT, 0.6f, 0.6f);
         }
     }
