@@ -2,13 +2,21 @@ package com.dari.endoftheworld.item;
 
 import com.dari.endoftheworld.EndOfTheWorldMod;
 import com.dari.endoftheworld.block.ModBlocks;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
-/** See ModBlocks.java for why this uses DeferredRegister<Item> + RegistryObject, not NeoForge's DeferredItem. */
+/**
+ * See ModBlocks.java for the .setId(...) fix — Item.Properties needs the same
+ * treatment. useBlockDescriptionPrefix() makes this BlockItem reuse the
+ * block.endoftheworld.generator_lever translation key (already in our lang
+ * files) instead of expecting a separate item.* key.
+ */
 public final class ModItems {
 
     public static final DeferredRegister<Item> ITEMS =
@@ -16,7 +24,10 @@ public final class ModItems {
 
     public static final RegistryObject<BlockItem> GENERATOR_LEVER = ITEMS.register(
             "generator_lever",
-            () -> new BlockItem(ModBlocks.GENERATOR_LEVER.get(), new Item.Properties())
+            () -> new BlockItem(ModBlocks.GENERATOR_LEVER.get(), new Item.Properties()
+                    .setId(ResourceKey.create(Registries.ITEM,
+                            ResourceLocation.fromNamespaceAndPath(EndOfTheWorldMod.MOD_ID, "generator_lever")))
+                    .useBlockDescriptionPrefix())
     );
 
     private ModItems() {

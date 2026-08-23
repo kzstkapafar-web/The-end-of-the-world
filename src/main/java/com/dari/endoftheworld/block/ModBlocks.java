@@ -1,6 +1,9 @@
 package com.dari.endoftheworld.block;
 
 import com.dari.endoftheworld.EndOfTheWorldMod;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
@@ -9,12 +12,13 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
 /**
- * NOTE ON THIS FILE: first version used DeferredRegister.Blocks/DeferredBlock,
- * which turned out to be NeoForge-only API — this Forge build doesn't have
- * those classes at all. Switched to the classic DeferredRegister<Block> +
- * RegistryObject<T> + ForgeRegistries.BLOCKS pattern, which is what Forge's
- * own docs actually show (I'd mistrusted that pattern earlier because other
- * Forge docs pages turned out stale, but this one was right all along).
+ * NOTE ON THIS FILE: second real-runtime crash fixed here — "Block id not set".
+ * Confirmed cause (not guessed): since a recent Minecraft version, BlockBehaviour.Properties
+ * requires an explicit .setId(ResourceKey.create(Registries.BLOCK, ...)) call before being
+ * passed into a Block constructor; the registry no longer assigns the name automatically
+ * after the fact. Added below. Also confirmed: this Forge build uses the classic
+ * DeferredRegister<Block> + RegistryObject<T> + ForgeRegistries.BLOCKS pattern, not
+ * NeoForge's DeferredRegister.Blocks/DeferredBlock.
  */
 public final class ModBlocks {
 
@@ -24,6 +28,8 @@ public final class ModBlocks {
     public static final RegistryObject<GeneratorLeverBlock> GENERATOR_LEVER = BLOCKS.register(
             "generator_lever",
             () -> new GeneratorLeverBlock(BlockBehaviour.Properties.of()
+                    .setId(ResourceKey.create(Registries.BLOCK,
+                            ResourceLocation.fromNamespaceAndPath(EndOfTheWorldMod.MOD_ID, "generator_lever")))
                     .mapColor(MapColor.METAL)
                     .noOcclusion()
                     .strength(2.0f))
