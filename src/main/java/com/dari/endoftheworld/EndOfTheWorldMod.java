@@ -1,7 +1,9 @@
 package com.dari.endoftheworld;
 
+import com.dari.endoftheworld.block.ModBlocks;
 import com.dari.endoftheworld.config.EndOfTheWorldConfig;
 import com.dari.endoftheworld.event.WorldEndTickHandler;
+import com.dari.endoftheworld.item.ModItems;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
@@ -13,16 +15,16 @@ import org.slf4j.Logger;
 /**
  * Root entry point of the mod.
  *
- * Stage 1 (Этап 1) — confirmed via a real GitHub Actions build: the
- * constructor signature and EventBus 7 pattern below (FMLJavaModLoadingContext
- * + context.getModBusGroup() + EventName.getBus(modBusGroup)) compile and
- * run correctly against Forge 61.1.5 / Minecraft 1.21.11.
+ * Stage 1 — confirmed working: constructor signature + EventBus 7 pattern
+ * (FMLJavaModLoadingContext + context.getModBusGroup() + EventName.getBus(modBusGroup)).
  *
- * Stage 2 (Этап 2) adds registration of EndOfTheWorldConfig and wires up
- * WorldEndTickHandler on the game bus. ModLoadingContext.get().registerConfig(...)
- * compiled fine but produces a [removal] deprecation warning (non-blocking) —
- * left as-is for now since it doesn't fail the build; can be cleaned up later
- * in favour of a direct container reference.
+ * Stage 2 — confirmed working: EndOfTheWorldConfig registration, WorldEndTickHandler.
+ *
+ * Stage 5 (Этап 5) adds ModBlocks/ModItems registration. Least-certain part
+ * of this stage: whether DeferredRegister.Blocks/.Items#register(...) takes
+ * the same modBusGroup we use elsewhere, or a different bus reference —
+ * registry registration wasn't covered by the EventBus 7 migration notes I
+ * had for the rest of this mod. If gradlew build fails here, send the error.
  */
 @Mod(EndOfTheWorldMod.MOD_ID)
 public class EndOfTheWorldMod {
@@ -39,7 +41,10 @@ public class EndOfTheWorldMod {
 
         WorldEndTickHandler.register();
 
-        LOGGER.info("[{}] Мод инициализирован (Этап 2 — фаза/таймер/сохранение)", MOD_ID);
+        ModBlocks.BLOCKS.register(modBusGroup);
+        ModItems.ITEMS.register(modBusGroup);
+
+        LOGGER.info("[{}] Мод инициализирован (Этап 5 — блок генератора)", MOD_ID);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
