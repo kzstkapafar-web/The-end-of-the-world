@@ -1,6 +1,7 @@
 package com.dari.endoftheworld.event;
 
 import com.dari.endoftheworld.catastrophe.DisasterScheduler;
+import com.dari.endoftheworld.catastrophe.EarthquakeDisaster;
 import com.dari.endoftheworld.world.WorldEndState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraftforge.event.TickEvent;
@@ -8,11 +9,11 @@ import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 
 /**
- * Advances {@link WorldEndState} and rolls {@link DisasterScheduler} once per
- * server tick. Server-only: this class must never touch client state or run
- * on the client.
+ * Advances {@link WorldEndState}, rolls {@link DisasterScheduler}, and ticks
+ * any in-progress earthquake effects, once per server tick. Server-only:
+ * this class must never touch client state or run on the client.
  * <p>
- * Confirmed working by a real GitHub Actions build (Stage 2): the manual
+ * Confirmed working by real GitHub Actions builds (Stages 2-9): the manual
  * {@code EventName.BUS.addListener(...)} registration pattern below compiles
  * and runs correctly on this Forge build. Call {@link #register()} once from
  * the mod constructor to wire it up.
@@ -48,5 +49,6 @@ public final class WorldEndTickHandler {
         WorldEndState state = WorldEndState.get(server.overworld());
         state.tick();
         DISASTER_SCHEDULER.tick(server.overworld(), state.getPhase());
+        EarthquakeDisaster.INSTANCE.tickActiveEffects(server.overworld());
     }
 }
