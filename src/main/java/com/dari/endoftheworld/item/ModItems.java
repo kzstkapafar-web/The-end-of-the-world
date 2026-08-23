@@ -4,7 +4,7 @@ import com.dari.endoftheworld.EndOfTheWorldMod;
 import com.dari.endoftheworld.block.ModBlocks;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.registries.DeferredRegister;
@@ -12,8 +12,10 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
 /**
- * See ModBlocks.java for the .setId(...) fix — Item.Properties needs the same
- * treatment. useBlockDescriptionPrefix() makes this BlockItem reuse the
+ * See ModBlocks.java for both fixes applied here too: .setId(...) is required
+ * on Item.Properties, and ResourceLocation was renamed to Identifier (moved
+ * to net.minecraft.util) in the 1.21.10->1.21.11 jump this mod targets.
+ * useBlockDescriptionPrefix() makes this BlockItem reuse the
  * block.endoftheworld.generator_lever translation key (already in our lang
  * files) instead of expecting a separate item.* key.
  */
@@ -26,7 +28,7 @@ public final class ModItems {
             "generator_lever",
             () -> new BlockItem(ModBlocks.GENERATOR_LEVER.get(), new Item.Properties()
                     .setId(ResourceKey.create(Registries.ITEM,
-                            ResourceLocation.fromNamespaceAndPath(EndOfTheWorldMod.MOD_ID, "generator_lever")))
+                            Identifier.fromNamespaceAndPath(EndOfTheWorldMod.MOD_ID, "generator_lever")))
                     .useBlockDescriptionPrefix())
     );
 
