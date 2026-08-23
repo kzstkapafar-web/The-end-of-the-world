@@ -3,6 +3,7 @@ package com.dari.endoftheworld;
 import com.dari.endoftheworld.block.ModBlocks;
 import com.dari.endoftheworld.config.EndOfTheWorldConfig;
 import com.dari.endoftheworld.event.WorldEndTickHandler;
+import com.dari.endoftheworld.item.ModCreativeModeTabs;
 import com.dari.endoftheworld.item.ModItems;
 import com.mojang.logging.LogUtils;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -20,11 +21,11 @@ import org.slf4j.Logger;
  *
  * Stage 2 — confirmed working: EndOfTheWorldConfig registration, WorldEndTickHandler.
  *
- * Stage 5 (Этап 5) adds ModBlocks/ModItems registration. Least-certain part
- * of this stage: whether DeferredRegister.Blocks/.Items#register(...) takes
- * the same modBusGroup we use elsewhere, or a different bus reference —
- * registry registration wasn't covered by the EventBus 7 migration notes I
- * had for the rest of this mod. If gradlew build fails here, send the error.
+ * Stages 5-7 — confirmed working via real client runs, not just CI:
+ * ModBlocks/ModItems registration (classic DeferredRegister<T>+RegistryObject<T>).
+ *
+ * Stage 8 (Этап 8) adds ModCreativeModeTabs, same registration pattern as
+ * ModBlocks/ModItems (DeferredRegister<CreativeModeTab> on the mod bus).
  */
 @Mod(EndOfTheWorldMod.MOD_ID)
 public class EndOfTheWorldMod {
@@ -43,8 +44,9 @@ public class EndOfTheWorldMod {
 
         ModBlocks.BLOCKS.register(modBusGroup);
         ModItems.ITEMS.register(modBusGroup);
+        ModCreativeModeTabs.CREATIVE_MODE_TABS.register(modBusGroup);
 
-        LOGGER.info("[{}] Мод инициализирован (Этап 5 — блок генератора)", MOD_ID);
+        LOGGER.info("[{}] Мод инициализирован (Этап 8 — творческая вкладка)", MOD_ID);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
