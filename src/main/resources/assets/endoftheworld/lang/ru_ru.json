@@ -1,4 +1,9 @@
 {
   "itemGroup.endoftheworld": "Конец света",
-  "block.endoftheworld.generator_lever": "Рычаг генератора"
+  "block.endoftheworld.generator_lever": "Рычаг генератора",
+  "block.endoftheworld.power_switch": "Рубильник питания",
+  "block.endoftheworld.lighting_switch": "Выключатель освещения",
+  "block.endoftheworld.ventilation_valve": "Клапан вентиляции",
+  "block.endoftheworld.water_pump": "Водяной насос",
+  "block.endoftheworld.central_computer": "Центральный компьютер"
 }

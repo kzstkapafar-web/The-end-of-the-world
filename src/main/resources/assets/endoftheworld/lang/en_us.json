@@ -1,4 +1,9 @@
 {
   "itemGroup.endoftheworld": "The End of the World",
-  "block.endoftheworld.generator_lever": "Generator Lever"
+  "block.endoftheworld.generator_lever": "Generator Lever",
+  "block.endoftheworld.power_switch": "Power Switch",
+  "block.endoftheworld.lighting_switch": "Lighting Switch",
+  "block.endoftheworld.ventilation_valve": "Ventilation Valve",
+  "block.endoftheworld.water_pump": "Water Pump",
+  "block.endoftheworld.central_computer": "Central Computer"
 }
