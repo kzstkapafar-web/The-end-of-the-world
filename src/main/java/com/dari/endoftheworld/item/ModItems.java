@@ -4,7 +4,7 @@ import com.dari.endoftheworld.EndOfTheWorldMod;
 import com.dari.endoftheworld.block.ModBlocks;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.registries.DeferredRegister;

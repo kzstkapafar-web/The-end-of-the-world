@@ -3,7 +3,7 @@ package com.dari.endoftheworld.block;
 import com.dari.endoftheworld.EndOfTheWorldMod;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
@@ -15,11 +15,17 @@ import net.minecraftforge.registries.RegistryObject;
  * NOTE ON THIS FILE: two real-runtime crashes fixed here.
  * 1) "Block id not set" — confirmed: BlockBehaviour.Properties needs an
  *    explicit .setId(ResourceKey.create(Registries.BLOCK, ...)) call now.
- * 2) "cannot find symbol: ResourceLocation" — confirmed via the official
- *    1.21.10->1.21.11 migration primer: ResourceLocation was renamed to
- *    Identifier and moved from net.minecraft.resources to net.minecraft.util
- *    in exactly this version jump. Not a guess — matched the primer to our
- *    exact version.
+ * 2) "cannot find symbol: ResourceLocation" / then "cannot find symbol: Identifier"
+ *    — this took two tries. Confirmed via NeoForged's own 1.21.11 release
+ *    announcement: ResourceLocation actually was renamed to Identifier in
+ *    exactly this Minecraft version. My first fix wrongly also moved the
+ *    import to net.minecraft.util, conflating a separate sentence in the
+ *    migration primer about "most utility classes" moving there in general.
+ *    Identifier stays in the original net.minecraft.resources package, just
+ *    renamed in place. If this is wrong again, the fastest way to get ground
+ *    truth is grepping the actual Forge/Minecraft jar in your local Gradle
+ *    cache (~/.gradle/caches/...) for "class Identifier" — faster than me
+ *    searching further.
  * Also confirmed: this Forge build uses the classic DeferredRegister<Block>
  * + RegistryObject<T> + ForgeRegistries.BLOCKS pattern, not NeoForge's
  * DeferredRegister.Blocks/DeferredBlock.
