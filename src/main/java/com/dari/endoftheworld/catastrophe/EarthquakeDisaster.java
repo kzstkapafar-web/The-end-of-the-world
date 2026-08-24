@@ -9,9 +9,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.item.FallingBlockEntity;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.ArrayList;
@@ -92,6 +89,7 @@ public final class EarthquakeDisaster implements Disaster {
     public void tickActiveEffects(ServerLevel level) {
         tickWaves(level);
         faultLineSystem.tick(level);
+        StructuralCollapseSystem.tick(level);
     }
 
     private void tickWaves(ServerLevel level) {
@@ -136,19 +134,13 @@ public final class EarthquakeDisaster implements Disaster {
             int z = wave.epicenter.getZ() + (int) Math.round(Math.sin(angle) * wave.radius);
 
             int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
-            BlockPos pos = new BlockPos(x, surfaceY - 1, z);
+            // Check a small vertical slice near the surface, not just the top block -
+            // this is what lets overhangs, tree trunks, and low structures on this
+            // ring get evaluated by StructuralCollapseSystem, not just bare ground.
+            int sampleY = surfaceY - 1 - RANDOM.nextInt(4);
+            BlockPos pos = new BlockPos(x, sampleY, z);
 
-            BlockState state = level.getBlockState(pos);
-
-            if (state.isAir()
-                    || !state.getFluidState().isEmpty()
-                    || state.hasBlockEntity()
-                    || state.getDestroySpeed(level, pos) < 0) {
-                continue;
-            }
-
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-            FallingBlockEntity.fall(level, pos, state);
+            StructuralCollapseSystem.checkAndCollapse(level, pos);
 
             level.sendParticles(ParticleTypes.CRIT,
                     pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
