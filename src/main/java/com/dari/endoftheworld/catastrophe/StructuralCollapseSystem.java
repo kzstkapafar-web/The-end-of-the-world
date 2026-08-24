@@ -3,6 +3,7 @@ package com.dari.endoftheworld.catastrophe;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -10,7 +11,6 @@ import net.minecraft.tags.BlockTags;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 /**
  * Unified "insufficient support" physics check — a single mechanic covering
@@ -33,7 +33,7 @@ import java.util.Random;
  */
 public final class StructuralCollapseSystem {
 
-    private static final Random RANDOM = new Random();
+    private static final RandomSource RANDOM = RandomSource.create();
     private static final int SUPPORT_CHECK_RADIUS = 2;
     private static final int MAX_TREE_HEIGHT = 24;
     private static final List<TogglingTree> togglingTrees = new ArrayList<>();
