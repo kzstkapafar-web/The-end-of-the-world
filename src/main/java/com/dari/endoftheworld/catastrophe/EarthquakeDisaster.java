@@ -45,6 +45,12 @@ import java.util.Random;
  * Also spawns a {@link FaultLineSystem} fault at the epicenter — see that
  * class for the procedural canyon/sinkhole mechanic, kept in its own file
  * since it's a fully separate concern from the wave/player-effect logic here.
+ * <p>
+ * Epicenter now comes from {@link FaultRegistry} — a persistent set of fixed
+ * geological fault points in the world, NOT a player's position. Earlier
+ * revisions incorrectly used a random online player as the epicenter, which
+ * made earthquakes implicitly player-following; real fault lines are fixed
+ * features of the world that don't care whether anyone is nearby.
  */
 public final class EarthquakeDisaster implements Disaster {
 
@@ -65,18 +71,12 @@ public final class EarthquakeDisaster implements Disaster {
 
     @Override
     public void trigger(ServerLevel level) {
-        List<ServerPlayer> players = level.players();
-        if (players.isEmpty()) {
-            return;
-        }
-
-        ServerPlayer epicenterPlayer = players.get(RANDOM.nextInt(players.size()));
-        BlockPos epicenter = epicenterPlayer.blockPosition();
+        BlockPos epicenter = FaultRegistry.get(level).pickEpicenter(level, RANDOM);
 
         level.playSound(null, epicenter, SoundEvents.WARDEN_HEARTBEAT,
                 SoundSource.AMBIENT, 4.0f, 0.6f);
 
-        for (ServerPlayer player : players) {
+        for (ServerPlayer player : level.players()) {
             player.sendSystemMessage(Component.literal("Что-то большое движется под землёй..."));
         }
 
