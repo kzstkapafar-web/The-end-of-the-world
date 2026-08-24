@@ -41,13 +41,14 @@ import java.util.UUID;
  *   After a shake ends (if it was strong enough to matter), a weaker
  *   aftershock is scheduled 5-15s later from the same epicenter.
  * <p>
- * UNVERIFIED PART OF THIS FILE: FallingBlockEntity.hurtEntities is accessed
- * as a public field below. Multiple Yarn-mapped API listings show this field
- * as private in Fabric's mappings, but Forge's official (Mojang) mappings
- * for the same field have historically differed in visibility, and I
- * couldn't confirm which applies to this exact build. If gradlew build
- * fails on that line specifically, it likely needs a setter method instead
- * of direct field access — send the error and I'll fix it.
+ * NOTE ON THIS FILE: the hurtEntities field IS private in this build (confirmed
+ * by a real compile failure: "hurtEntities has private access in
+ * FallingBlockEntity"). Fixed by switching to the setHurtsEntities(float, int)
+ * setter method, whose name and signature I sourced from a CraftTweaker
+ * wrapper around this same class rather than an official Mojang-mapped
+ * source — CraftTweaker setters are often thin pass-throughs with the same
+ * name, but I haven't confirmed that's the case here. If gradlew build
+ * disagrees on this line specifically, send the error.
  */
 public final class EarthquakeDisaster implements Disaster {
 
@@ -175,7 +176,7 @@ public final class EarthquakeDisaster implements Disaster {
             FallingBlockEntity falling = FallingBlockEntity.fall(level, pos, state);
 
             if (intensity >= MIN_MAGNITUDE_TO_DAMAGE) {
-                falling.hurtEntities = true;
+                falling.setHurtsEntities(1.0f, 20);
             }
             return; // one block per collapse call - gradual, not an instant crater
         }
