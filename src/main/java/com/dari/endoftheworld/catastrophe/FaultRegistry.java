@@ -69,13 +69,18 @@ public class FaultRegistry extends SavedData {
     }
 
     private void generateInitialFaults(ServerLevel level, Random random) {
-        BlockPos spawn = level.getSharedSpawnPos();
+        // Reference point is the world origin (0,0), not the configured spawn point -
+        // avoids depending on ServerLevel#getSharedSpawnPos(), which doesn't exist in
+        // this build (confirmed by a real compile failure). In practice this is close
+        // enough to spawn for most worlds, and the exact reference point doesn't
+        // matter for what fault generation needs.
+        BlockPos origin = BlockPos.ZERO;
 
         for (int i = 0; i < TARGET_FAULT_COUNT; i++) {
             int dx = random.nextInt(SPAWN_SEARCH_RADIUS * 2) - SPAWN_SEARCH_RADIUS;
             int dz = random.nextInt(SPAWN_SEARCH_RADIUS * 2) - SPAWN_SEARCH_RADIUS;
-            int x = spawn.getX() + dx;
-            int z = spawn.getZ() + dz;
+            int x = origin.getX() + dx;
+            int z = origin.getZ() + dz;
             int y = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
             epicenters.add(new BlockPos(x, y, z));
         }
