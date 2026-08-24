@@ -73,7 +73,7 @@ public final class EarthquakeDisaster implements Disaster {
         ServerPlayer epicenterPlayer = players.get(RANDOM.nextInt(players.size()));
         BlockPos epicenter = epicenterPlayer.blockPosition();
 
-        level.playSound(null, epicenter, SoundEvents.WARDEN_HEARTBEAT.value(),
+        level.playSound(null, epicenter, SoundEvents.WARDEN_HEARTBEAT,
                 SoundSource.AMBIENT, 4.0f, 0.6f);
 
         for (ServerPlayer player : players) {
@@ -121,7 +121,7 @@ public final class EarthquakeDisaster implements Disaster {
             if (Math.abs(distance - wave.radius) <= FRONT_BAND && !wave.alreadyHit.contains(player.getUUID())) {
                 wave.alreadyHit.add(player.getUUID());
 
-                player.addEffect(new MobEffectInstance(MobEffects.CONFUSION, NAUSEA_DURATION_TICKS, 0));
+                player.addEffect(new MobEffectInstance(MobEffects.NAUSEA, NAUSEA_DURATION_TICKS, 0));
                 level.sendParticles(ParticleTypes.CRIT,
                         player.getX(), player.getY() + 1.0, player.getZ(),
                         8, 0.4, 0.4, 0.4, 0.0);
