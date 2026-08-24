@@ -7,64 +7,58 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.UUID;
 
 /**
- * Earthquake disaster modeled loosely on how real earthquakes behave, not
- * just a generic shake effect:
+ * Earthquake disaster, rebuilt as a genuinely different mechanic from a
+ * generic "shove + explosion sound" effect: a seismic wave that physically
+ * radiates outward from an epicenter across the terrain, like ripples on
+ * water. Nothing happens to a player until the wavefront actually reaches
+ * their position — this is a propagating world event, not a player-centric
+ * particle burst.
  * <p>
- * - Single epicenter (a random online player's position at trigger time).
- *   Everyone else's intensity falls off with distance from it, like real
- *   seismic attenuation — simplified to a linear falloff rather than a full
- *   physical model, which isn't worth the complexity here.
- * - Peak intensity near the start of the shake, tapering off over its
- *   duration — real quakes hit hardest in the first moments and decay, they
- *   don't shake at a constant level throughout.
- * - Two kinds of ground failure per pulse: collapse below the player
- *   (ground giving way) and above (cave-ins/falling debris — a real and
- *   often more dangerous earthquake hazard underground, and directly
- *   relevant since Minecraft players dig).
- * - Falling debris can actually hurt you (hurtEntities on the spawned
- *   FallingBlockEntity), only above a minimum intensity so weak tremors
- *   stay harmless.
- * - Aftershocks: real earthquakes are reliably followed by smaller ones.
- *   After a shake ends (if it was strong enough to matter), a weaker
- *   aftershock is scheduled 5-15s later from the same epicenter.
+ * Deliberately does NOT use: explosion sound, or any push/knockback on the
+ * player. Instead:
+ * - Sound: SoundEvents.WARDEN_HEARTBEAT — a deep, ominous, non-explosive rumble.
+ * - Felt effect: MobEffects.CONFUSION (nausea/screen-warp) applied briefly to
+ *   a player only at the moment the wavefront passes their position —
+ *   disorientation rather than being physically shoved.
+ * - Ground damage: sampled points ALONG the expanding ring itself (not
+ *   randomly near the player) are converted to falling blocks as the wave
+ *   passes through them, so the destruction visibly radiates outward with
+ *   the wave rather than appearing as a random local cluster.
  * <p>
- * NOTE ON THIS FILE: the hurtEntities field IS private in this build (confirmed
- * by a real compile failure: "hurtEntities has private access in
- * FallingBlockEntity"). Fixed by switching to the setHurtsEntities(float, int)
- * setter method, whose name and signature I sourced from a CraftTweaker
- * wrapper around this same class rather than an official Mojang-mapped
- * source — CraftTweaker setters are often thin pass-throughs with the same
- * name, but I haven't confirmed that's the case here. If gradlew build
- * disagrees on this line specifically, send the error.
+ * Performance: each active wave samples a small, fixed number of ring
+ * positions per tick (not proportional to the ring's growing circumference),
+ * and player checks are a cheap distance comparison against the small set of
+ * currently-online players — no chunk/area scans.
+ * <p>
+ * Also spawns a {@link FaultLineSystem} fault at the epicenter — see that
+ * class for the procedural canyon/sinkhole mechanic, kept in its own file
+ * since it's a fully separate concern from the wave/player-effect logic here.
  */
 public final class EarthquakeDisaster implements Disaster {
 
     public static final EarthquakeDisaster INSTANCE = new EarthquakeDisaster();
 
     private static final Random RANDOM = new Random();
-    private static final int BASE_SHAKE_TICKS = 40; // ~2s at full magnitude
-    private static final int PULSE_EVERY_TICKS = 4;
-    private static final int MAX_RADIUS = 80; // blocks from epicenter still felt at all
-    private static final int CANDIDATE_POSITIONS_PER_PULSE = 6;
-    private static final int COLLAPSE_RADIUS = 3;
-    private static final double MIN_MAGNITUDE_TO_DAMAGE = 0.5;
-    private static final double MIN_MAGNITUDE_FOR_AFTERSHOCK = 0.3;
+    private static final double WAVE_SPEED_BLOCKS_PER_TICK = 1.0;
+    private static final double MAX_RADIUS = 56.0;
+    private static final double FRONT_BAND = 1.5; // how "thick" the passing wavefront is, for player detection
+    private static final int TERRAIN_SAMPLES_PER_TICK = 6;
+    private static final int NAUSEA_DURATION_TICKS = 100; // 5s
 
-    private final Map<UUID, ShakeState> shakingPlayers = new HashMap<>();
-    private final List<PendingAftershock> pendingAftershocks = new ArrayList<>();
+    private final List<SeismicWave> activeWaves = new ArrayList<>();
+    private final FaultLineSystem faultLineSystem = new FaultLineSystem();
 
     private EarthquakeDisaster() {
     }
@@ -77,91 +71,72 @@ public final class EarthquakeDisaster implements Disaster {
         }
 
         ServerPlayer epicenterPlayer = players.get(RANDOM.nextInt(players.size()));
-        startShake(level, epicenterPlayer.blockPosition(), 1.0, BASE_SHAKE_TICKS);
-    }
+        BlockPos epicenter = epicenterPlayer.blockPosition();
 
-    private void startShake(ServerLevel level, BlockPos epicenter, double epicenterMagnitude, int baseDurationTicks) {
-        for (ServerPlayer player : level.players()) {
-            double distance = Math.sqrt(player.blockPosition().distSqr(epicenter));
-            double magnitude = epicenterMagnitude * Math.max(0.0, 1.0 - distance / MAX_RADIUS);
+        level.playSound(null, epicenter, SoundEvents.WARDEN_HEARTBEAT.value(),
+                SoundSource.AMBIENT, 4.0f, 0.6f);
 
-            if (magnitude <= 0.02) {
-                continue; // too far from the epicenter to feel anything
-            }
-
-            player.sendSystemMessage(Component.literal(
-                    magnitude > 0.6 ? "Земля дрожит под ногами..." : "Где-то вдалеке дрожит земля..."));
-
-            level.playSound(null, player.blockPosition(), SoundEvents.GENERIC_EXPLODE.value(),
-                    SoundSource.AMBIENT, (float) (0.4 + magnitude * 0.5), 0.5f);
-
-            int duration = Math.max(PULSE_EVERY_TICKS, (int) (baseDurationTicks * magnitude));
-            shakingPlayers.put(player.getUUID(), new ShakeState(duration, duration, magnitude));
+        for (ServerPlayer player : players) {
+            player.sendSystemMessage(Component.literal("Что-то большое движется под землёй..."));
         }
+
+        activeWaves.add(new SeismicWave(epicenter));
+        faultLineSystem.start(epicenter);
     }
 
     /**
      * Call once per server tick (independent of DisasterScheduler's own roll
-     * interval) so shakes and aftershocks keep playing out smoothly.
+     * interval) so waves, faults, and sinkholes keep progressing and
+     * eventually dissipate on their own.
      */
     public void tickActiveEffects(ServerLevel level) {
-        tickShakes(level);
-        tickAftershocks(level);
+        tickWaves(level);
+        faultLineSystem.tick(level);
     }
 
-    private void tickShakes(ServerLevel level) {
-        if (shakingPlayers.isEmpty()) {
+    private void tickWaves(ServerLevel level) {
+        if (activeWaves.isEmpty()) {
             return;
         }
 
-        Iterator<Map.Entry<UUID, ShakeState>> iterator = shakingPlayers.entrySet().iterator();
+        var iterator = activeWaves.iterator();
         while (iterator.hasNext()) {
-            Map.Entry<UUID, ShakeState> entry = iterator.next();
-            ShakeState shake = entry.getValue();
-            ServerPlayer player = level.getServer().getPlayerList().getPlayer(entry.getKey());
+            SeismicWave wave = iterator.next();
+            wave.radius += WAVE_SPEED_BLOCKS_PER_TICK;
 
-            if (player == null || shake.remainingTicks <= 0) {
-                if (player != null) {
-                    scheduleAftershock(player.blockPosition(), shake.magnitude);
-                }
+            if (wave.radius > MAX_RADIUS) {
                 iterator.remove();
                 continue;
             }
 
-            if (shake.remainingTicks % PULSE_EVERY_TICKS == 0) {
-                // real quakes hit hardest early and taper off, not constant intensity throughout
-                double intensityNow = shake.magnitude * (shake.remainingTicks / (double) shake.totalTicks);
-                pulse(level, player, intensityNow);
+            affectPlayersOnWavefront(level, wave);
+            damageTerrainAlongWavefront(level, wave);
+        }
+    }
+
+    private void affectPlayersOnWavefront(ServerLevel level, SeismicWave wave) {
+        for (ServerPlayer player : level.players()) {
+            double distance = horizontalDistance(player.blockPosition(), wave.epicenter);
+
+            if (Math.abs(distance - wave.radius) <= FRONT_BAND && !wave.alreadyHit.contains(player.getUUID())) {
+                wave.alreadyHit.add(player.getUUID());
+
+                player.addEffect(new MobEffectInstance(MobEffects.CONFUSION, NAUSEA_DURATION_TICKS, 0));
+                level.sendParticles(ParticleTypes.CRIT,
+                        player.getX(), player.getY() + 1.0, player.getZ(),
+                        8, 0.4, 0.4, 0.4, 0.0);
             }
-
-            shake.remainingTicks--;
         }
     }
 
-    private void pulse(ServerLevel level, ServerPlayer player, double intensity) {
-        double shoveX = (RANDOM.nextDouble() - 0.5) * 0.5 * intensity;
-        double shoveZ = (RANDOM.nextDouble() - 0.5) * 0.5 * intensity;
-        player.push(shoveX, 0.05 * intensity, shoveZ);
-        player.hurtMarked = true; // force the velocity change to sync client-side
+    private void damageTerrainAlongWavefront(ServerLevel level, SeismicWave wave) {
+        for (int i = 0; i < TERRAIN_SAMPLES_PER_TICK; i++) {
+            double angle = RANDOM.nextDouble() * Math.PI * 2.0;
+            int x = wave.epicenter.getX() + (int) Math.round(Math.cos(angle) * wave.radius);
+            int z = wave.epicenter.getZ() + (int) Math.round(Math.sin(angle) * wave.radius);
 
-        int particleCount = Math.max(2, (int) (10 * intensity));
-        level.sendParticles(ParticleTypes.POOF,
-                player.getX(), player.getY() + 0.1, player.getZ(),
-                particleCount, 1.0, 0.1, 1.0, 0.01);
-
-        if (RANDOM.nextDouble() < intensity) {
-            collapseNear(level, player.blockPosition(), intensity, -1); // ground below
-        }
-        if (RANDOM.nextDouble() < intensity * 0.6) {
-            collapseNear(level, player.blockPosition(), intensity, 2); // ceiling above - cave-ins
-        }
-    }
-
-    private void collapseNear(ServerLevel level, BlockPos center, double intensity, int yOffset) {
-        for (int i = 0; i < CANDIDATE_POSITIONS_PER_PULSE; i++) {
-            int dx = RANDOM.nextInt(COLLAPSE_RADIUS * 2 + 1) - COLLAPSE_RADIUS;
-            int dz = RANDOM.nextInt(COLLAPSE_RADIUS * 2 + 1) - COLLAPSE_RADIUS;
-            BlockPos pos = center.offset(dx, yOffset, dz);
+            int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+            BlockPos pos = new BlockPos(x, surfaceY - 1, z);
 
             BlockState state = level.getBlockState(pos);
 
@@ -173,62 +148,27 @@ public final class EarthquakeDisaster implements Disaster {
             }
 
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-            FallingBlockEntity falling = FallingBlockEntity.fall(level, pos, state);
+            FallingBlockEntity.fall(level, pos, state);
 
-            if (intensity >= MIN_MAGNITUDE_TO_DAMAGE) {
-                falling.setHurtsEntities(1.0f, 20);
-            }
-            return; // one block per collapse call - gradual, not an instant crater
+            level.sendParticles(ParticleTypes.CRIT,
+                    pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                    3, 0.3, 0.1, 0.3, 0.0);
         }
     }
 
-    private void scheduleAftershock(BlockPos epicenter, double previousMagnitude) {
-        if (previousMagnitude < MIN_MAGNITUDE_FOR_AFTERSHOCK) {
-            return; // too weak to bother with a follow-up
-        }
-        int delayTicks = 100 + RANDOM.nextInt(200); // 5-15s
-        double aftershockMagnitude = previousMagnitude * 0.4;
-        pendingAftershocks.add(new PendingAftershock(epicenter, aftershockMagnitude, delayTicks));
+    private static double horizontalDistance(BlockPos a, BlockPos b) {
+        double dx = a.getX() - b.getX();
+        double dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
-    private void tickAftershocks(ServerLevel level) {
-        if (pendingAftershocks.isEmpty()) {
-            return;
-        }
-
-        Iterator<PendingAftershock> iterator = pendingAftershocks.iterator();
-        while (iterator.hasNext()) {
-            PendingAftershock pending = iterator.next();
-            pending.ticksRemaining--;
-
-            if (pending.ticksRemaining <= 0) {
-                startShake(level, pending.epicenter, pending.magnitude, BASE_SHAKE_TICKS / 2);
-                iterator.remove();
-            }
-        }
-    }
-
-    private static final class ShakeState {
-        int remainingTicks;
-        final int totalTicks;
-        final double magnitude;
-
-        ShakeState(int remainingTicks, int totalTicks, double magnitude) {
-            this.remainingTicks = remainingTicks;
-            this.totalTicks = totalTicks;
-            this.magnitude = magnitude;
-        }
-    }
-
-    private static final class PendingAftershock {
+    private static final class SeismicWave {
         final BlockPos epicenter;
-        final double magnitude;
-        int ticksRemaining;
+        double radius = 0.0;
+        final List<java.util.UUID> alreadyHit = new ArrayList<>();
 
-        PendingAftershock(BlockPos epicenter, double magnitude, int ticksRemaining) {
+        SeismicWave(BlockPos epicenter) {
             this.epicenter = epicenter;
-            this.magnitude = magnitude;
-            this.ticksRemaining = ticksRemaining;
         }
     }
 }
